@@ -40,6 +40,7 @@
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
+UART_HandleTypeDef hlpuart1;
 UART_HandleTypeDef huart1;
 UART_HandleTypeDef huart2;
 UART_HandleTypeDef huart3;
@@ -51,6 +52,7 @@ UART_HandleTypeDef huart6;
 uint8_t controllbyte;
 uint8_t buffer_down[24];
 uint8_t buffer_up[24];
+UART_HandleTypeDef* motor_controller[6];
 
 /* USER CODE END PV */
 
@@ -63,6 +65,7 @@ static void MX_USART3_UART_Init(void);
 static void MX_USART4_UART_Init(void);
 static void MX_USART5_UART_Init(void);
 static void MX_USART6_UART_Init(void);
+static void MX_LPUART1_UART_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -80,7 +83,12 @@ int main(void)
 {
 
   /* USER CODE BEGIN 1 */
-
+	motor_controller[0]=&huart1;
+	motor_controller[1]=&huart3;
+	motor_controller[2]=&huart4;
+	motor_controller[3]=&huart5;
+	motor_controller[4]=&huart6;
+	motor_controller[5]=&hlpuart1;
 
   /* USER CODE END 1 */
 
@@ -108,6 +116,7 @@ int main(void)
   MX_USART4_UART_Init();
   MX_USART5_UART_Init();
   MX_USART6_UART_Init();
+  MX_LPUART1_UART_Init();
   /* USER CODE BEGIN 2 */
   for(int i=0;i<24;i++){
 	  buffer_up[i]=0;
@@ -126,10 +135,14 @@ int main(void)
   {
 	  if(HAL_UART_Receive(&huart2,&controllbyte,1,0)==HAL_OK){
 		  HAL_UART_Receive(&huart2, buffer_down, 24,100);
-		  HAL_UART_Transmit(&huart1, &controllbyte, 1, 100);
-		  HAL_UART_Transmit(&huart1, &(buffer_down[0]), 4, 100);
-		  temp=HAL_UART_Receive(&huart1,&(buffer_up[0]),4,100);
-		  //memcpy(&buffer_up[0],&temp,4);
+
+		 for(int i=0;i<6;i++){
+			 HAL_UART_Transmit(motor_controller[i], &controllbyte, 1, 100);
+			 HAL_UART_Transmit(motor_controller[i], &(buffer_down[i*4]), 4, 100);
+			 temp=HAL_UART_Receive(motor_controller[i],&(buffer_up[i*4]),4,1);
+			  //memcpy(&buffer_up[0],&temp,4);
+
+		 }
 		  HAL_UART_Transmit(&huart2, buffer_up, 24, 100);
 	  }
 
@@ -180,6 +193,54 @@ void SystemClock_Config(void)
   {
     Error_Handler();
   }
+}
+
+/**
+  * @brief LPUART1 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_LPUART1_UART_Init(void)
+{
+
+  /* USER CODE BEGIN LPUART1_Init 0 */
+
+  /* USER CODE END LPUART1_Init 0 */
+
+  /* USER CODE BEGIN LPUART1_Init 1 */
+
+  /* USER CODE END LPUART1_Init 1 */
+  hlpuart1.Instance = LPUART1;
+  hlpuart1.Init.BaudRate = 209700;
+  hlpuart1.Init.WordLength = UART_WORDLENGTH_7B;
+  hlpuart1.Init.StopBits = UART_STOPBITS_1;
+  hlpuart1.Init.Parity = UART_PARITY_NONE;
+  hlpuart1.Init.Mode = UART_MODE_TX_RX;
+  hlpuart1.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+  hlpuart1.Init.OneBitSampling = UART_ONE_BIT_SAMPLE_DISABLE;
+  hlpuart1.Init.ClockPrescaler = UART_PRESCALER_DIV1;
+  hlpuart1.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_NO_INIT;
+  hlpuart1.FifoMode = UART_FIFOMODE_DISABLE;
+  if (HAL_UART_Init(&hlpuart1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_UARTEx_SetTxFifoThreshold(&hlpuart1, UART_TXFIFO_THRESHOLD_1_8) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_UARTEx_SetRxFifoThreshold(&hlpuart1, UART_RXFIFO_THRESHOLD_1_8) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_UARTEx_DisableFifoMode(&hlpuart1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN LPUART1_Init 2 */
+
+  /* USER CODE END LPUART1_Init 2 */
+
 }
 
 /**
@@ -446,6 +507,7 @@ static void MX_GPIO_Init(void)
   /* USER CODE END MX_GPIO_Init_1 */
 
   /* GPIO Ports Clock Enable */
+  __HAL_RCC_GPIOC_CLK_ENABLE();
   __HAL_RCC_GPIOA_CLK_ENABLE();
   __HAL_RCC_GPIOB_CLK_ENABLE();
   __HAL_RCC_GPIOD_CLK_ENABLE();
