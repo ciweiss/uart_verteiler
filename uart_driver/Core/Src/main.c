@@ -139,48 +139,63 @@ int main(void)
   timestamp = HAL_GetTick();
   while (1)
   {
-	  if(HAL_UART_Receive(&huart2,&controllbyte,1,0)==HAL_OK){
-		  HAL_UART_Receive(&huart2, buffer_down, 24,100);
-		  while(HAL_UART_Receive(&huart2,&byte_tmp,1,0)==HAL_OK)
-		  {
+	  if(HAL_UART_Receive(&huart2,&controllbyte,1,0) == HAL_OK)
+	  {
+		if(HAL_UART_Receive(&huart2, buffer_down, 24, 3) == HAL_OK)
+		{
+			for(int i=0;i<6;i++)
+			{
+				HAL_UART_Transmit(motor_controller[i], &controllbyte, 1, 1);
+				HAL_UART_Transmit(motor_controller[i], &(buffer_down[i*4]), 4, 2);
+			}
+		}
+		while(HAL_UART_Receive(&huart2, &byte_tmp, 1, 0)==HAL_OK)
+		{
 
-		  }
-		 for(int i=0;i<6;i++){
-			 HAL_UART_Transmit(motor_controller[i], &controllbyte, 1, 100);
-			 HAL_UART_Transmit(motor_controller[i], &(buffer_down[i*4]), 4, 100);
-		 }
+		}
 	  }
-//	  for(int i=0;i<6;i++){
-//		  if(HAL_UART_Receive(motor_controller[i], &buffer_tmp[0],1 , 0) == HAL_OK)
-//		  {
-//			  if(HAL_UART_Receive(motor_controller[i], &buffer_tmp[1], 3, 1000) == HAL_OK)
-//			  {
+	  for(int i=0;i<6;i++){
+		  if(HAL_UART_Receive(motor_controller[i], &buffer_tmp[0],1 , 0) == HAL_OK)
+		  {
+			  if(HAL_UART_Receive(motor_controller[i], &buffer_tmp[1], 3, 1) == HAL_OK)
+			  {
 //				  float zero = 1.0;
-////				  memcpy(&buffer_up[i*4], &zero,4);
-//				  memcpy(&buffer_up[i*4], &buffer_tmp[0],4);
-//			  }
-//			  else
-//			  {
+//				  memcpy(&buffer_up[i*4], &zero,4);
+				  memcpy(&buffer_up[i*4], &buffer_tmp[0],4);
+			  }
+			  else
+			  {
+
 //				  float zero = 2.0;
 //				  memcpy(&buffer_up[i*4], &zero,4);
-//			  }
-//			  while(HAL_UART_Receive(motor_controller[i],&byte_tmp,1,0)==HAL_OK)
-//			  {
-//
-//			  }
-////			  memcpy(&buffer_up[i*4], &buffer_tmp[0],4);
-//		  }
+			  }
+			  while(HAL_UART_Receive(motor_controller[i], &byte_tmp, 1, 0)==HAL_OK)
+			  {
+
+			  }
+//			  memcpy(&buffer_up[i*4], &buffer_tmp[0],4);
+		  }
 //		  else
 //		  {
 //			  float zero = 0.0;
 //			  memcpy(&buffer_up[i*4], &zero,4);
 //		  }
+	  }
+
+//	  if(HAL_UART_Receive(motor_controller[0], &buffer_tmp[0],1 , 0) == HAL_OK)
+//	  {
+//		  if(HAL_UART_Receive(motor_controller[0], &buffer_tmp[1],3 , 1) == HAL_OK)
+//		  {
+//			  memcpy(&buffer_up[0*4], &buffer_tmp[0],4);
+//		  }
+//		  else{
+//			  while(HAL_UART_Receive(motor_controller[0], &buffer_tmp[0],1 , 0) == HAL_OK)
+//			  {
+//
+//			  }
+//		  }
 //	  }
 
-	  if(HAL_UART_Receive(motor_controller[0], &buffer_tmp[0],4 , 40) == HAL_OK)
-	  {
-		  memcpy(&buffer_up[0*4], &buffer_tmp[0],4);
-	  }
 
 	  float zero = (float)(HAL_GetTick() - timestamp2);
 	  timestamp2 = HAL_GetTick();
