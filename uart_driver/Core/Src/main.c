@@ -129,6 +129,7 @@ int main(void)
 	  memcpy(&buffer_up[i*4],&temp,4);
   }
   uint32_t timestamp = 0;
+  uint32_t timestamp2 = 0;
   uint32_t upward_send_interval = 100;
 
   /* USER CODE END 2 */
@@ -149,37 +150,42 @@ int main(void)
 			 HAL_UART_Transmit(motor_controller[i], &(buffer_down[i*4]), 4, 100);
 		 }
 	  }
-	  for(int i=0;i<6;i++){
-		  if(HAL_UART_Receive(motor_controller[i], &buffer_tmp[0],1 , 10) == HAL_OK)
-		  {
-			  if(HAL_UART_Receive(motor_controller[i], &buffer_tmp[1], 3, 100) == HAL_OK)
-			  {
-				  float zero = 1.0;
+//	  for(int i=0;i<6;i++){
+//		  if(HAL_UART_Receive(motor_controller[i], &buffer_tmp[0],1 , 0) == HAL_OK)
+//		  {
+//			  if(HAL_UART_Receive(motor_controller[i], &buffer_tmp[1], 3, 1000) == HAL_OK)
+//			  {
+//				  float zero = 1.0;
+////				  memcpy(&buffer_up[i*4], &zero,4);
+//				  memcpy(&buffer_up[i*4], &buffer_tmp[0],4);
+//			  }
+//			  else
+//			  {
+//				  float zero = 2.0;
 //				  memcpy(&buffer_up[i*4], &zero,4);
-				  memcpy(&buffer_up[i*4], &buffer_tmp[0],4);
-			  }
-			  else
-			  {
-				  float zero = 2.0;
-				  memcpy(&buffer_up[i*4], &zero,4);
-			  }
-			  while(HAL_UART_Receive(motor_controller[i],&byte_tmp,1,0)==HAL_OK)
-			  {
+//			  }
+//			  while(HAL_UART_Receive(motor_controller[i],&byte_tmp,1,0)==HAL_OK)
+//			  {
+//
+//			  }
+////			  memcpy(&buffer_up[i*4], &buffer_tmp[0],4);
+//		  }
+//		  else
+//		  {
+//			  float zero = 0.0;
+//			  memcpy(&buffer_up[i*4], &zero,4);
+//		  }
+//	  }
 
-			  }
-		  }
-		  else
-		  {
-			  float zero = 0.0;
-			  memcpy(&buffer_up[i*4], &zero,4);
-		  }
-		  if(i==5)
-		  {
-			  float zero = (float)(HAL_GetTick() - timestamp);
-			  memcpy(&buffer_up[i*4], &zero,4);
-		  }
-
+	  if(HAL_UART_Receive(motor_controller[0], &buffer_tmp[0],4 , 40) == HAL_OK)
+	  {
+		  memcpy(&buffer_up[0*4], &buffer_tmp[0],4);
 	  }
+
+	  float zero = (float)(HAL_GetTick() - timestamp2);
+	  timestamp2 = HAL_GetTick();
+	  memcpy(&buffer_up[5*4], &zero,4);
+
 
 	  if(HAL_GetTick() - timestamp > upward_send_interval)
 	  {
