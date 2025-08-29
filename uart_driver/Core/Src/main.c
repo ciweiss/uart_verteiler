@@ -50,8 +50,10 @@ UART_HandleTypeDef huart6;
 
 /* USER CODE BEGIN PV */
 uint8_t controllbyte;
+uint8_t byte_tmp;
 uint8_t buffer_down[24];
 uint8_t buffer_up[24];
+uint8_t buffer_tmp[4];
 UART_HandleTypeDef* motor_controller[6];
 
 /* USER CODE END PV */
@@ -125,25 +127,64 @@ int main(void)
   float temp=256.0;
   for(int i=0;i<6;i++){
 	  memcpy(&buffer_up[i*4],&temp,4);
-
   }
+  uint32_t timestamp = 0;
+  uint32_t upward_send_interval = 100;
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
+  timestamp = HAL_GetTick();
   while (1)
   {
 	  if(HAL_UART_Receive(&huart2,&controllbyte,1,0)==HAL_OK){
 		  HAL_UART_Receive(&huart2, buffer_down, 24,100);
+		  while(HAL_UART_Receive(&huart2,&byte_tmp,1,0)==HAL_OK)
+		  {
 
+		  }
 		 for(int i=0;i<6;i++){
 			 HAL_UART_Transmit(motor_controller[i], &controllbyte, 1, 100);
 			 HAL_UART_Transmit(motor_controller[i], &(buffer_down[i*4]), 4, 100);
-			 temp=HAL_UART_Receive(motor_controller[i],&(buffer_up[i*4]),4,1);
-			  //memcpy(&buffer_up[0],&temp,4);
-
 		 }
+	  }
+	  for(int i=0;i<6;i++){
+		  if(HAL_UART_Receive(motor_controller[i], &buffer_tmp[0],1 , 10) == HAL_OK)
+		  {
+			  if(HAL_UART_Receive(motor_controller[i], &buffer_tmp[1], 3, 100) == HAL_OK)
+			  {
+				  float zero = 1.0;
+//				  memcpy(&buffer_up[i*4], &zero,4);
+				  memcpy(&buffer_up[i*4], &buffer_tmp[0],4);
+			  }
+			  else
+			  {
+				  float zero = 2.0;
+				  memcpy(&buffer_up[i*4], &zero,4);
+			  }
+			  while(HAL_UART_Receive(motor_controller[i],&byte_tmp,1,0)==HAL_OK)
+			  {
+
+			  }
+		  }
+		  else
+		  {
+			  float zero = 0.0;
+			  memcpy(&buffer_up[i*4], &zero,4);
+		  }
+		  if(i==5)
+		  {
+			  float zero = (float)(HAL_GetTick() - timestamp);
+			  memcpy(&buffer_up[i*4], &zero,4);
+		  }
+
+	  }
+
+	  if(HAL_GetTick() - timestamp > upward_send_interval)
+	  {
 		  HAL_UART_Transmit(&huart2, buffer_up, 24, 100);
+		  timestamp = HAL_GetTick();
 	  }
 
 
