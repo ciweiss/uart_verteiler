@@ -129,8 +129,7 @@ int main(void)
 	  memcpy(&buffer_up[i*4],&temp,4);
   }
   uint32_t timestamp = 0;
-  uint32_t timestamp2 = 0;
-  uint32_t upward_send_interval = 100;
+  uint32_t upward_send_interval = 10;
 
   /* USER CODE END 2 */
 
@@ -139,7 +138,7 @@ int main(void)
   timestamp = HAL_GetTick();
   while (1)
   {
-	  if(HAL_UART_Receive(&huart2,&controllbyte,1,0) == HAL_OK)
+	  if(HAL_UART_Receive(&huart2, &controllbyte, 1, 0) == HAL_OK)
 	  {
 		if(HAL_UART_Receive(&huart2, buffer_down, 24, 3) == HAL_OK)
 		{
@@ -149,62 +148,31 @@ int main(void)
 				HAL_UART_Transmit(motor_controller[i], &(buffer_down[i*4]), 4, 2);
 			}
 		}
-		while(HAL_UART_Receive(&huart2, &byte_tmp, 1, 0)==HAL_OK)
+		else
 		{
-
+			while(HAL_UART_Receive(&huart2, &byte_tmp, 1, 0)==HAL_OK)
+			{
+			}
 		}
 	  }
 	  for(int i=0;i<6;i++){
-		  if(HAL_UART_Receive(motor_controller[i], &buffer_tmp[0],1 , 0) == HAL_OK)
+		  if(HAL_UART_Receive(motor_controller[i], &buffer_tmp[0], 1 , 0) == HAL_OK)
 		  {
 			  if(HAL_UART_Receive(motor_controller[i], &buffer_tmp[1], 3, 1) == HAL_OK)
 			  {
-//				  float zero = 1.0;
-//				  memcpy(&buffer_up[i*4], &zero,4);
-				  memcpy(&buffer_up[i*4], &buffer_tmp[0],4);
+				  memcpy(&buffer_up[i*4], &buffer_tmp[0], 4);
 			  }
 			  else
 			  {
-
-//				  float zero = 2.0;
-//				  memcpy(&buffer_up[i*4], &zero,4);
+				  while(HAL_UART_Receive(motor_controller[i], &byte_tmp, 1, 0)==HAL_OK)
+				  {
+				  }
 			  }
-			  while(HAL_UART_Receive(motor_controller[i], &byte_tmp, 1, 0)==HAL_OK)
-			  {
-
-			  }
-//			  memcpy(&buffer_up[i*4], &buffer_tmp[0],4);
 		  }
-//		  else
-//		  {
-//			  float zero = 0.0;
-//			  memcpy(&buffer_up[i*4], &zero,4);
-//		  }
 	  }
-
-//	  if(HAL_UART_Receive(motor_controller[0], &buffer_tmp[0],1 , 0) == HAL_OK)
-//	  {
-//		  if(HAL_UART_Receive(motor_controller[0], &buffer_tmp[1],3 , 1) == HAL_OK)
-//		  {
-//			  memcpy(&buffer_up[0*4], &buffer_tmp[0],4);
-//		  }
-//		  else{
-//			  while(HAL_UART_Receive(motor_controller[0], &buffer_tmp[0],1 , 0) == HAL_OK)
-//			  {
-//
-//			  }
-//		  }
-//	  }
-
-
-	  float zero = (float)(HAL_GetTick() - timestamp2);
-	  timestamp2 = HAL_GetTick();
-	  memcpy(&buffer_up[5*4], &zero,4);
-
-
 	  if(HAL_GetTick() - timestamp > upward_send_interval)
 	  {
-		  HAL_UART_Transmit(&huart2, buffer_up, 24, 100);
+		  HAL_UART_Transmit(&huart2, buffer_up, 24, upward_send_interval);
 		  timestamp = HAL_GetTick();
 	  }
 
@@ -279,12 +247,13 @@ static void MX_LPUART1_UART_Init(void)
 
   /* USER CODE END LPUART1_Init 1 */
   hlpuart1.Instance = LPUART1;
-  hlpuart1.Init.BaudRate = 209700;
-  hlpuart1.Init.WordLength = UART_WORDLENGTH_7B;
+  hlpuart1.Init.BaudRate = 115200;
+  hlpuart1.Init.WordLength = UART_WORDLENGTH_8B;
   hlpuart1.Init.StopBits = UART_STOPBITS_1;
   hlpuart1.Init.Parity = UART_PARITY_NONE;
   hlpuart1.Init.Mode = UART_MODE_TX_RX;
   hlpuart1.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+  hlpuart1.Init.OverSampling = UART_OVERSAMPLING_16;
   hlpuart1.Init.OneBitSampling = UART_ONE_BIT_SAMPLE_DISABLE;
   hlpuart1.Init.ClockPrescaler = UART_PRESCALER_DIV1;
   hlpuart1.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_NO_INIT;
