@@ -52,7 +52,12 @@ UART_HandleTypeDef huart6;
 uint8_t controllbyte;
 uint8_t byte_tmp;
 uint8_t buffer_down[24];
-uint8_t buffer_up[24];
+#define buffer_up_size  24
+#define  buffer_up_cobs_size  buffer_up_size+2
+
+uint8_t buffer_up[buffer_up_size];
+uint8_t buffer_up_cobs[buffer_up_cobs_size];
+
 uint8_t buffer_tmp[4];
 UART_HandleTypeDef* motor_controller[6];
 
@@ -138,8 +143,12 @@ int main(void)
   timestamp = HAL_GetTick();
   while (1)
   {
-	  if(HAL_UART_Receive(&huart2, &controllbyte, 1, 0) == HAL_OK)
-	  {
+	if (__HAL_UART_GET_FLAG(&huart2, UART_FLAG_ORE)) {
+		// Overrun error occurred, need to clear the flag
+		__HAL_UART_CLEAR_OREFLAG(&huart2); // Use the specific clear macro
+	}
+	if(HAL_UART_Receive(&huart2, &controllbyte, 1, 0) == HAL_OK)
+	{
 		if(HAL_UART_Receive(&huart2, buffer_down, 24, 3) == HAL_OK)
 		{
 			for(int i=0;i<6;i++)
@@ -154,30 +163,30 @@ int main(void)
 			{
 			}
 		}
-	  }
-	  for(int i=0;i<6;i++){
-		  if(HAL_UART_Receive(motor_controller[i], &buffer_tmp[0], 1 , 0) == HAL_OK)
-		  {
-			  if(HAL_UART_Receive(motor_controller[i], &buffer_tmp[1], 3, 1) == HAL_OK)
-			  {
-				  memcpy(&buffer_up[i*4], &buffer_tmp[0], 4);
-			  }
-			  else
-			  {
-				  while(HAL_UART_Receive(motor_controller[i], &byte_tmp, 1, 0)==HAL_OK)
-				  {
-				  }
-			  }
-		  }
-	  }
-	  if(HAL_GetTick() - timestamp > upward_send_interval)
-	  {
-		  HAL_UART_Transmit(&huart2, buffer_up, 24, upward_send_interval);
-		  timestamp = HAL_GetTick();
-	  }
-
-
-
+	}
+	for(int i=0;i<6;i++){
+		if(HAL_UART_Receive(motor_controller[i], &buffer_tmp[0], 1 , 0) == HAL_OK)
+		{
+			if(HAL_UART_Receive(motor_controller[i], &buffer_tmp[1], 3, 1) == HAL_OK)
+			{
+			  memcpy(&buffer_up[i*4], &buffer_tmp[0], 4);
+			}
+			else
+			{
+				while(HAL_UART_Receive(motor_controller[i], &byte_tmp, 1, 0)==HAL_OK)
+				{
+				}
+			}
+		}
+	}
+	if(HAL_GetTick() - timestamp > upward_send_interval)
+	{
+		cobs_encode_result res = cobs_encode(buffer_up_cobs, buffer_up_cobs_size, buffer_up, buffer_up_size);
+		buffer_up_cobs[buffer_up_cobs_size-1] = 0;
+		HAL_UART_Transmit(&huart2, buffer_up_cobs, buffer_up_cobs_size, upward_send_interval);
+		//		  HAL_UART_Transmit(&huart2, buffer_up, 24, upward_send_interval);
+		timestamp = HAL_GetTick();
+	}
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
