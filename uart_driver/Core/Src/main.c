@@ -90,13 +90,19 @@ int main(void)
 {
 
   /* USER CODE BEGIN 1 */
+//	motor_controller[0]=&huart2;
+//	motor_controller[1]=&huart1;
+//	motor_controller[2]=&huart3;
+//	motor_controller[3]=&huart4;
+//	motor_controller[4]=&huart5;
+//	motor_controller[5]=&huart6;
+
 	motor_controller[0]=&huart2;
-	motor_controller[1]=&huart1;
-	motor_controller[2]=&huart3;
-	motor_controller[3]=&huart4;
+	motor_controller[1]=&huart3;
+	motor_controller[2]=&huart4;
+	motor_controller[3]=&huart1;
 	motor_controller[4]=&huart5;
 	motor_controller[5]=&huart6;
-
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
