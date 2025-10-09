@@ -41,6 +41,7 @@
 
 /* Private variables ---------------------------------------------------------*/
 UART_HandleTypeDef hlpuart1;
+UART_HandleTypeDef hlpuart2;
 UART_HandleTypeDef huart1;
 UART_HandleTypeDef huart2;
 UART_HandleTypeDef huart3;
@@ -66,6 +67,7 @@ static void MX_USART4_UART_Init(void);
 static void MX_USART5_UART_Init(void);
 static void MX_USART6_UART_Init(void);
 static void MX_LPUART1_UART_Init(void);
+static void MX_LPUART2_UART_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -83,12 +85,12 @@ int main(void)
 {
 
   /* USER CODE BEGIN 1 */
-	motor_controller[0]=&huart1;
-	motor_controller[1]=&huart3;
-	motor_controller[2]=&huart4;
-	motor_controller[3]=&huart5;
-	motor_controller[4]=&huart6;
-	motor_controller[5]=&hlpuart1;
+	motor_controller[0]=&huart2;
+	motor_controller[1]=&huart1;
+	motor_controller[2]=&huart3;
+	motor_controller[3]=&huart4;
+	motor_controller[4]=&huart5;
+	motor_controller[5]=&huart6;
 
   /* USER CODE END 1 */
 
@@ -117,6 +119,7 @@ int main(void)
   MX_USART5_UART_Init();
   MX_USART6_UART_Init();
   MX_LPUART1_UART_Init();
+  MX_LPUART2_UART_Init();
   /* USER CODE BEGIN 2 */
   for(int i=0;i<24;i++){
 	  buffer_up[i]=0;
@@ -246,6 +249,54 @@ static void MX_LPUART1_UART_Init(void)
   /* USER CODE BEGIN LPUART1_Init 2 */
 
   /* USER CODE END LPUART1_Init 2 */
+
+}
+
+/**
+  * @brief LPUART2 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_LPUART2_UART_Init(void)
+{
+
+  /* USER CODE BEGIN LPUART2_Init 0 */
+
+  /* USER CODE END LPUART2_Init 0 */
+
+  /* USER CODE BEGIN LPUART2_Init 1 */
+
+  /* USER CODE END LPUART2_Init 1 */
+  hlpuart2.Instance = LPUART2;
+  hlpuart2.Init.BaudRate = 115200;
+  hlpuart2.Init.WordLength = UART_WORDLENGTH_8B;
+  hlpuart2.Init.StopBits = UART_STOPBITS_1;
+  hlpuart2.Init.Parity = UART_PARITY_NONE;
+  hlpuart2.Init.Mode = UART_MODE_TX_RX;
+  hlpuart2.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+  hlpuart2.Init.OneBitSampling = UART_ONE_BIT_SAMPLE_DISABLE;
+  hlpuart2.Init.ClockPrescaler = UART_PRESCALER_DIV1;
+  hlpuart2.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_NO_INIT;
+  hlpuart2.FifoMode = UART_FIFOMODE_DISABLE;
+  if (HAL_UART_Init(&hlpuart2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_UARTEx_SetTxFifoThreshold(&hlpuart2, UART_TXFIFO_THRESHOLD_1_8) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_UARTEx_SetRxFifoThreshold(&hlpuart2, UART_RXFIFO_THRESHOLD_1_8) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_UARTEx_DisableFifoMode(&hlpuart2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN LPUART2_Init 2 */
+
+  /* USER CODE END LPUART2_Init 2 */
 
 }
 
@@ -513,6 +564,7 @@ static void MX_GPIO_Init(void)
   /* USER CODE END MX_GPIO_Init_1 */
 
   /* GPIO Ports Clock Enable */
+  __HAL_RCC_GPIOF_CLK_ENABLE();
   __HAL_RCC_GPIOC_CLK_ENABLE();
   __HAL_RCC_GPIOA_CLK_ENABLE();
   __HAL_RCC_GPIOB_CLK_ENABLE();

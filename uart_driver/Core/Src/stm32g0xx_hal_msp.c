@@ -125,6 +125,48 @@ void HAL_UART_MspInit(UART_HandleTypeDef* huart)
 
     /* USER CODE END LPUART1_MspInit 1 */
   }
+  else if(huart->Instance==LPUART2)
+  {
+    /* USER CODE BEGIN LPUART2_MspInit 0 */
+
+    /* USER CODE END LPUART2_MspInit 0 */
+
+  /** Initializes the peripherals clocks
+  */
+    PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_LPUART2;
+    PeriphClkInit.Lpuart2ClockSelection = RCC_LPUART2CLKSOURCE_PCLK1;
+    if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInit) != HAL_OK)
+    {
+      Error_Handler();
+    }
+
+    /* Peripheral clock enable */
+    __HAL_RCC_LPUART2_CLK_ENABLE();
+
+    __HAL_RCC_GPIOF_CLK_ENABLE();
+    __HAL_RCC_GPIOC_CLK_ENABLE();
+    /**LPUART2 GPIO Configuration
+    PF2-NRST     ------> LPUART2_TX
+    PC7     ------> LPUART2_RX
+    */
+    GPIO_InitStruct.Pin = GPIO_PIN_2;
+    GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+    GPIO_InitStruct.Alternate = GPIO_AF1_LPUART2;
+    HAL_GPIO_Init(GPIOF, &GPIO_InitStruct);
+
+    GPIO_InitStruct.Pin = GPIO_PIN_7;
+    GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+    GPIO_InitStruct.Alternate = GPIO_AF3_LPUART2;
+    HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
+
+    /* USER CODE BEGIN LPUART2_MspInit 1 */
+
+    /* USER CODE END LPUART2_MspInit 1 */
+  }
   else if(huart->Instance==USART1)
   {
     /* USER CODE BEGIN USART1_MspInit 0 */
@@ -330,6 +372,26 @@ void HAL_UART_MspDeInit(UART_HandleTypeDef* huart)
     /* USER CODE BEGIN LPUART1_MspDeInit 1 */
 
     /* USER CODE END LPUART1_MspDeInit 1 */
+  }
+  else if(huart->Instance==LPUART2)
+  {
+    /* USER CODE BEGIN LPUART2_MspDeInit 0 */
+
+    /* USER CODE END LPUART2_MspDeInit 0 */
+    /* Peripheral clock disable */
+    __HAL_RCC_LPUART2_CLK_DISABLE();
+
+    /**LPUART2 GPIO Configuration
+    PF2-NRST     ------> LPUART2_TX
+    PC7     ------> LPUART2_RX
+    */
+    HAL_GPIO_DeInit(GPIOF, GPIO_PIN_2);
+
+    HAL_GPIO_DeInit(GPIOC, GPIO_PIN_7);
+
+    /* USER CODE BEGIN LPUART2_MspDeInit 1 */
+
+    /* USER CODE END LPUART2_MspDeInit 1 */
   }
   else if(huart->Instance==USART1)
   {
