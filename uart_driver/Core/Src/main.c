@@ -50,8 +50,15 @@ UART_HandleTypeDef huart6;
 
 /* USER CODE BEGIN PV */
 uint8_t controllbyte;
+uint8_t byte_tmp;
 uint8_t buffer_down[24];
-uint8_t buffer_up[24];
+#define buffer_up_size  24
+#define  buffer_up_cobs_size  buffer_up_size+2
+
+uint8_t buffer_up[buffer_up_size];
+uint8_t buffer_up_cobs[buffer_up_cobs_size];
+
+uint8_t buffer_tmp[4];
 UART_HandleTypeDef* motor_controller[6];
 
 /* USER CODE END PV */
@@ -125,29 +132,61 @@ int main(void)
   float temp=256.0;
   for(int i=0;i<6;i++){
 	  memcpy(&buffer_up[i*4],&temp,4);
-
   }
+  uint32_t timestamp = 0;
+  uint32_t upward_send_interval = 10;
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
+  timestamp = HAL_GetTick();
   while (1)
   {
-	  if(HAL_UART_Receive(&hlpuart2,&controllbyte,1,0)==HAL_OK){
-		  HAL_UART_Receive(&hlpuart2, buffer_down, 24,100);
-
-		 for(int i=0;i<6;i++){
-			 HAL_UART_Transmit(motor_controller[i], &controllbyte, 1, 100);
-			 HAL_UART_Transmit(motor_controller[i], &(buffer_down[i*4]), 4, 100);
-			 temp=HAL_UART_Receive(motor_controller[i],&(buffer_up[i*4]),4,1);
-			  //memcpy(&buffer_up[0],&temp,4);
-
-		 }
-		  HAL_UART_Transmit(&hlpuart2, buffer_up, 24, 100);
-	  }
-
-
-
+	if (__HAL_UART_GET_FLAG(&hlpuart2, UART_FLAG_ORE)) {
+		// Overrun error occurred, need to clear the flag
+		__HAL_UART_CLEAR_OREFLAG(&hlpuart2); // Use the specific clear macro
+	}
+	if(HAL_UART_Receive(&hlpuart2, &controllbyte, 1, 0) == HAL_OK)
+	{
+		if(HAL_UART_Receive(&hlpuart2, buffer_down, 24, 3) == HAL_OK)
+		{
+			for(int i=0;i<6;i++)
+			{
+				HAL_UART_Transmit(motor_controller[i], &controllbyte, 1, 1);
+				HAL_UART_Transmit(motor_controller[i], &(buffer_down[i*4]), 4, 2);
+			}
+		}
+		else
+		{
+			while(HAL_UART_Receive(&hlpuart2, &byte_tmp, 1, 0)==HAL_OK)
+			{
+			}
+		}
+	}
+	for(int i=0;i<6;i++){
+		if(HAL_UART_Receive(motor_controller[i], &buffer_tmp[0], 1 , 0) == HAL_OK)
+		{
+			if(HAL_UART_Receive(motor_controller[i], &buffer_tmp[1], 3, 1) == HAL_OK)
+			{
+			  memcpy(&buffer_up[i*4], &buffer_tmp[0], 4);
+			}
+			else
+			{
+				while(HAL_UART_Receive(motor_controller[i], &byte_tmp, 1, 0)==HAL_OK)
+				{
+				}
+			}
+		}
+	}
+	if(HAL_GetTick() - timestamp > upward_send_interval)
+	{
+		cobs_encode_result res = cobs_encode(buffer_up_cobs, buffer_up_cobs_size, buffer_up, buffer_up_size);
+		buffer_up_cobs[buffer_up_cobs_size-1] = 0;
+		HAL_UART_Transmit(&hlpuart2, buffer_up_cobs, buffer_up_cobs_size, upward_send_interval);
+		//		  HAL_UART_Transmit(&huart2, buffer_up, 24, upward_send_interval);
+		timestamp = HAL_GetTick();
+	}
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -208,7 +247,6 @@ void SystemClock_Config(void)
   */
 static void MX_LPUART2_UART_Init(void)
 {
-
   /* USER CODE BEGIN LPUART2_Init 0 */
 
   /* USER CODE END LPUART2_Init 0 */
