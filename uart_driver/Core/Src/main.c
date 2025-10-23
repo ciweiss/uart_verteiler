@@ -57,7 +57,22 @@ uint8_t byte_tmp;
 //static uint8_t data[STATIC_BUFFER_SIZE];
 ringbuf_t buffer_up_rx;
 #define up_rx_message_length  25
+
+ringbuf_t* buffer_down_rx[6];
+ringbuf_t buffer_down_rx1;
+ringbuf_t buffer_down_rx2;
+ringbuf_t buffer_down_rx3;
+ringbuf_t buffer_down_rx4;
+ringbuf_t buffer_down_rx5;
+ringbuf_t buffer_down_rx6;
+
+
+#define down_rx_message_length 5
+
 uint8_t buffer_up_byte;
+uint8_t buffer_down_byte[6];
+
+
 
 #define buffer_down_size  24
 uint8_t buffer_down[buffer_down_size];
@@ -113,6 +128,18 @@ int main(void)
 //	motor_controller[5]=&huart6;
 
 	buffer_up_rx = ringbuf_new(STATIC_BUFFER_SIZE);
+	buffer_down_rx1=ringbuf_new(STATIC_BUFFER_SIZE);
+	buffer_down_rx2=ringbuf_new(STATIC_BUFFER_SIZE);
+	buffer_down_rx3=ringbuf_new(STATIC_BUFFER_SIZE);
+	buffer_down_rx4=ringbuf_new(STATIC_BUFFER_SIZE);
+	buffer_down_rx5=ringbuf_new(STATIC_BUFFER_SIZE);
+	buffer_down_rx6=ringbuf_new(STATIC_BUFFER_SIZE);
+	buffer_down_rx[0]=&buffer_down_rx1;
+	buffer_down_rx[1]=&buffer_down_rx2;
+	buffer_down_rx[2]=&buffer_down_rx3;
+	buffer_down_rx[3]=&buffer_down_rx4;
+	buffer_down_rx[4]=&buffer_down_rx5;
+	buffer_down_rx[5]=&buffer_down_rx6;
 
 	motor_controller[0]=&huart2;
 	motor_controller[1]=&huart3;
@@ -120,6 +147,7 @@ int main(void)
 	motor_controller[3]=&huart1;
 	motor_controller[4]=&huart5;
 	motor_controller[5]=&huart6;
+
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
@@ -182,7 +210,13 @@ int main(void)
 //		}
 //	}
 
-	HAL_UART_Receive_IT(&hlpuart2, &buffer_up_byte, 1);
+	HAL_UART_Receive_IT(&hlpuart2,	&buffer_up_byte, 1);
+	HAL_UART_Receive_IT(&huart1,  	&buffer_down_byte[0], 1);
+	HAL_UART_Receive_IT(&huart2,  	&buffer_down_byte[1], 1);
+	HAL_UART_Receive_IT(&huart3,  	&buffer_down_byte[2], 1);
+	HAL_UART_Receive_IT(&huart4,  	&buffer_down_byte[3], 1);
+	HAL_UART_Receive_IT(&huart5,  	&buffer_down_byte[4], 1);
+	HAL_UART_Receive_IT(&huart6,  	&buffer_down_byte[5], 1);
 	uint8_t rx_byte;
 	while(HAL_UART_Receive(&hlpuart2, &rx_byte, 1, 0) == HAL_OK)
 	{
@@ -648,8 +682,29 @@ static void MX_GPIO_Init(void)
 /* USER CODE BEGIN 4 */
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 {
-	ringbuf_memcpy_into(buffer_up_rx, &buffer_up_byte, 1);
-	HAL_UART_Receive_IT(&hlpuart2, &buffer_up_byte, 1);
+
+	if(huart==&hlpuart2){
+			ringbuf_memcpy_into(buffer_up_rx, &buffer_up_byte, 1);
+			HAL_UART_Receive_IT(&hlpuart2, &buffer_up_byte, 1);
+	}else if(huart==&huart1){
+			ringbuf_memcpy_into(*buffer_down_rx[0],  	&buffer_down_byte[0], 1);
+			HAL_UART_Receive_IT(&huart1,  		&buffer_down_byte[0], 1);
+	}else if(huart==&huart2){
+			ringbuf_memcpy_into(*buffer_down_rx[1],  	&buffer_down_byte[1], 1);
+			HAL_UART_Receive_IT(&huart2,  &buffer_down_byte[1], 1);
+	}else if(huart==&huart3){
+			ringbuf_memcpy_into(*buffer_down_rx[2],  	&buffer_down_byte[2], 1);
+			HAL_UART_Receive_IT(&huart3,  &buffer_down_byte[2], 1);
+	}else if(huart==&huart4){
+			ringbuf_memcpy_into(*buffer_down_rx[3],  	&buffer_down_byte[3], 1);
+			HAL_UART_Receive_IT(&huart4,  &buffer_down_byte[3], 1);
+	}else if(huart==&huart5){
+			ringbuf_memcpy_into(*buffer_down_rx[4],  	&buffer_down_byte[4], 1);
+			HAL_UART_Receive_IT(&huart5,  &buffer_down_byte[4], 1);
+	}else if(huart==&huart6){
+			ringbuf_memcpy_into(*buffer_down_rx[5],  	&buffer_down_byte[5], 1);
+			HAL_UART_Receive_IT(&huart6,  &buffer_down_byte[5], 1);
+	}
 }
 /* USER CODE END 4 */
 
