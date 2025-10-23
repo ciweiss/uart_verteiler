@@ -57,6 +57,7 @@ uint8_t byte_tmp;
 //static uint8_t data[STATIC_BUFFER_SIZE];
 ringbuf_t buffer_up_rx;
 #define up_rx_message_length  25
+uint8_t buffer_up_byte;
 
 #define buffer_down_size  24
 uint8_t buffer_down[buffer_down_size];
@@ -181,7 +182,7 @@ int main(void)
 //		}
 //	}
 
-
+	HAL_UART_Receive_IT(&hlpuart2, &buffer_up_byte, 1);
 	uint8_t rx_byte;
 	while(HAL_UART_Receive(&hlpuart2, &rx_byte, 1, 0) == HAL_OK)
 	{
@@ -329,6 +330,7 @@ void SystemClock_Config(void)
   */
 static void MX_LPUART2_UART_Init(void)
 {
+
   /* USER CODE BEGIN LPUART2_Init 0 */
 
   /* USER CODE END LPUART2_Init 0 */
@@ -644,7 +646,11 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
-
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
+{
+	ringbuf_memcpy_into(buffer_up_rx, &buffer_up_byte, 1);
+	HAL_UART_Receive_IT(&hlpuart2, &buffer_up_byte, 1);
+}
 /* USER CODE END 4 */
 
 /**

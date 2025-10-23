@@ -121,6 +121,9 @@ void HAL_UART_MspInit(UART_HandleTypeDef* huart)
     GPIO_InitStruct.Alternate = GPIO_AF3_LPUART2;
     HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
+    /* LPUART2 interrupt Init */
+    HAL_NVIC_SetPriority(USART2_LPUART2_IRQn, 0, 0);
+    HAL_NVIC_EnableIRQ(USART2_LPUART2_IRQn);
     /* USER CODE BEGIN LPUART2_MspInit 1 */
 
     /* USER CODE END LPUART2_MspInit 1 */
@@ -189,6 +192,9 @@ void HAL_UART_MspInit(UART_HandleTypeDef* huart)
     GPIO_InitStruct.Alternate = GPIO_AF1_USART2;
     HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
+    /* USART2 interrupt Init */
+    HAL_NVIC_SetPriority(USART2_LPUART2_IRQn, 0, 0);
+    HAL_NVIC_EnableIRQ(USART2_LPUART2_IRQn);
     /* USER CODE BEGIN USART2_MspInit 1 */
 
     /* USER CODE END USART2_MspInit 1 */
@@ -327,6 +333,15 @@ void HAL_UART_MspDeInit(UART_HandleTypeDef* huart)
     */
     HAL_GPIO_DeInit(GPIOC, GPIO_PIN_6|GPIO_PIN_7);
 
+    /* LPUART2 interrupt DeInit */
+    /* USER CODE BEGIN LPUART2:USART2_LPUART2_IRQn disable */
+    /**
+    * Uncomment the line below to disable the "USART2_LPUART2_IRQn" interrupt
+    * Be aware, disabling shared interrupt may affect other IPs
+    */
+    /* HAL_NVIC_DisableIRQ(USART2_LPUART2_IRQn); */
+    /* USER CODE END LPUART2:USART2_LPUART2_IRQn disable */
+
     /* USER CODE BEGIN LPUART2_MspDeInit 1 */
 
     /* USER CODE END LPUART2_MspDeInit 1 */
@@ -362,6 +377,15 @@ void HAL_UART_MspDeInit(UART_HandleTypeDef* huart)
     PA3     ------> USART2_RX
     */
     HAL_GPIO_DeInit(GPIOA, GPIO_PIN_2|GPIO_PIN_3);
+
+    /* USART2 interrupt DeInit */
+    /* USER CODE BEGIN USART2:USART2_LPUART2_IRQn disable */
+    /**
+    * Uncomment the line below to disable the "USART2_LPUART2_IRQn" interrupt
+    * Be aware, disabling shared interrupt may affect other IPs
+    */
+    /* HAL_NVIC_DisableIRQ(USART2_LPUART2_IRQn); */
+    /* USER CODE END USART2:USART2_LPUART2_IRQn disable */
 
     /* USER CODE BEGIN USART2_MspDeInit 1 */
 
