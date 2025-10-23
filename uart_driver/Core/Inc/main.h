@@ -28,10 +28,11 @@ extern "C" {
 
 /* Includes ------------------------------------------------------------------*/
 #include "stm32g0xx_hal.h"
-#include "cobs.h"
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include <string.h>
+#include "cobs.h"
+#include "ringbuf.h"
 /* USER CODE END Includes */
 
 /* Exported types ------------------------------------------------------------*/
