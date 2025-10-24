@@ -33,7 +33,7 @@ extern "C" {
 /* USER CODE BEGIN Includes */
 #include <string.h>
 #include "cobs.h"
-#include "ringbuf.h"
+#include "ringbuffer.h"
 /* USER CODE END Includes */
 
 /* Exported types ------------------------------------------------------------*/

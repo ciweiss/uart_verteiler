@@ -49,46 +49,157 @@ UART_HandleTypeDef huart5;
 UART_HandleTypeDef huart6;
 
 /* USER CODE BEGIN PV */
+#define min(a,b) (((a) < (b)) ? (a) : (b))
+#define max(a,b) (((a) > (b)) ? (a) : (b))
 uint8_t controllbyte;
 uint8_t byte_tmp;
+
 #define cobs_size_increase 2
 #define STATIC_BUFFER_SIZE 512
 
-//static uint8_t data[STATIC_BUFFER_SIZE];
-ringbuf_t buffer_up_rx;
+//ringbuf_t buffer_up_rx;
 #define up_rx_message_length  25
 
-ringbuf_t* buffer_down_rx[6];
-ringbuf_t buffer_down_rx1;
-ringbuf_t buffer_down_rx2;
-ringbuf_t buffer_down_rx3;
-ringbuf_t buffer_down_rx4;
-ringbuf_t buffer_down_rx5;
-ringbuf_t buffer_down_rx6;
 
-
-#define down_rx_message_length 5
-
-uint8_t buffer_up_byte;
-uint8_t buffer_down_byte[6];
-
-
-
-#define buffer_down_size  24
-uint8_t buffer_down[buffer_down_size];
-
-#define buffer_up_size  24
 #define  cobs_buffer_decoded_size  512
 #define  cobs_buffer_encoded_size  cobs_buffer_decoded_size + cobs_size_increase
-
-#define up_tx_message_length  24
-#define up_tx_message_length_encoded up_tx_message_length + cobs_size_increase
-
-uint8_t buffer_up[buffer_up_size];
-uint8_t cobs_buffer_encoded[cobs_buffer_encoded_size ];
+uint8_t cobs_buffer_encoded[cobs_buffer_encoded_size];
 uint8_t cobs_buffer_decoded[cobs_buffer_decoded_size];
 
-uint8_t buffer_tmp[4];
+#define RING_BUFFER_SIZE 512
+
+typedef struct
+{
+	UART_HandleTypeDef* uart_handle;
+	ring_buffer_t ringbuffer;
+	uint8_t ringbuffer_arr[RING_BUFFER_SIZE];
+	uint8_t message_counter;
+    uint8_t rx_byte;
+    uint8_t message_size_encoded;
+    // cobs decoding is done sequentially -> only one buffer needed
+    uint8_t* cobs_buffer_encoded;
+    uint8_t* cobs_buffer_decoded;
+
+} UART_Buffer;
+
+void interrupt_callback(UART_Buffer* uart_buffer)
+{
+	if(!(ring_buffer_is_full(&uart_buffer->ringbuffer) && uart_buffer->message_counter != 0))
+	{
+		ring_buffer_queue(&uart_buffer->ringbuffer, uart_buffer->rx_byte);
+		if(uart_buffer->rx_byte == 0)
+		{
+			uart_buffer->message_counter++;
+		}
+	}
+	HAL_UART_Receive_IT(uart_buffer->uart_handle, &uart_buffer->rx_byte, 1);
+}
+
+typedef enum
+{
+    NEW_MESSAGE_IN_DECODED_COBS_BUFFER  	= 0x00,
+	TOO_FEW_BYTES_IN_RINGBUFFER     		= 0x01,
+    COBS_DECODING_FAILED 					= 0x02,
+    NO_ZERO_BYTE_IN_RINGBUFFER  			= 0x03,
+    NO_NEW_MESSAGE				  			= 0x04,
+    ERROR_DURING_RETRIEVING_FROM_RINGBUFFER	= 0x05,
+} message_status;
+
+message_status retrieve_message(UART_Buffer* uart_buffer)
+{
+	if(uart_buffer->message_counter > 0 || ring_buffer_is_full(&uart_buffer->ringbuffer))
+	{
+		size_t num_of_items_in_buffer = ring_buffer_num_items(&uart_buffer->ringbuffer);
+		size_t index_of_zero = 0;
+
+		while(index_of_zero < num_of_items_in_buffer)
+		{
+			uint8_t peeked_item;
+			ring_buffer_peek(&uart_buffer->ringbuffer, &peeked_item, index_of_zero);
+			if(peeked_item == 0)
+			{
+				break;
+			}
+			index_of_zero++;
+		}
+//		return TOO_FEW_BYTES_IN_RINGBUFFER;
+
+		if(index_of_zero == num_of_items_in_buffer) // ringbuffer is full and no zeros
+		{
+//			uart_buffer->ringbuffer.tail_index = 0;
+//			uart_buffer->ringbuffer.head_index = 0;
+//			uart_buffer->ringbuffer.tail_index = ((uart_buffer->ringbuffer.tail_index + index_of_zero) & uart_buffer->ringbuffer.buffer_mask);
+
+			uart_buffer->message_counter = 0;
+			return NO_ZERO_BYTE_IN_RINGBUFFER;
+		}
+		else
+		{
+			uart_buffer->message_counter--;
+		}
+		if(index_of_zero + 1 < uart_buffer->message_size_encoded) // too few bytes for complete message
+		{
+			uart_buffer->ringbuffer.tail_index = ((uart_buffer->ringbuffer.tail_index + index_of_zero + 1) & uart_buffer->ringbuffer.buffer_mask);
+			return TOO_FEW_BYTES_IN_RINGBUFFER;
+		}
+		// remove extra bytes before beginning of message
+		size_t extra_bytes_before_message = max(index_of_zero + 1 - uart_buffer->message_size_encoded, 0);
+		uart_buffer->ringbuffer.tail_index = ((uart_buffer->ringbuffer.tail_index + extra_bytes_before_message) & uart_buffer->ringbuffer.buffer_mask);
+
+		size_t number_of_retrieved_bytes = ring_buffer_dequeue_arr(&uart_buffer->ringbuffer, uart_buffer->cobs_buffer_encoded, uart_buffer->message_size_encoded);
+
+		if(number_of_retrieved_bytes == uart_buffer->message_size_encoded)
+		{
+
+//			HAL_UART_Transmit(uart_buffer->uart_handle, &number_of_retrieved_bytes, 4, 1);
+
+			cobs_decode_result res = cobs_decode(uart_buffer->cobs_buffer_decoded, cobs_buffer_decoded_size, uart_buffer->cobs_buffer_encoded, uart_buffer->message_size_encoded-1);
+			if (res.status == COBS_DECODE_OK)
+			{
+				return NEW_MESSAGE_IN_DECODED_COBS_BUFFER;
+			}
+			else
+			{
+				return COBS_DECODING_FAILED;
+			}
+		}
+		else
+		{
+			return ERROR_DURING_RETRIEVING_FROM_RINGBUFFER;
+		}
+	}
+	else
+	{
+		return NO_NEW_MESSAGE;
+	}
+}
+
+UART_Buffer uart_buffer_pc;
+UART_Buffer uart_buffer_motors[6];
+
+
+//#define down_rx_message_length 5
+
+//uint8_t buffer_up_byte;
+//uint8_t buffer_down_byte[6];
+
+//uint8_t up_rx_message_counter = 0;
+//uint8_t down_rx_message_counter[6] = {0};
+
+
+//#define buffer_down_size  24
+//uint8_t buffer_down[buffer_down_size];
+
+#define buffer_pc_tx_size  24
+//#define  cobs_buffer_size  100
+
+//#define up_tx_message_length  24
+//#define up_tx_message_length_encoded up_tx_message_length + cobs_size_increase
+
+uint8_t buffer_pc_tx[buffer_pc_tx_size];
+
+
+//uint8_t buffer_tmp[4];
 UART_HandleTypeDef* motor_controller[6];
 
 /* USER CODE END PV */
@@ -105,6 +216,55 @@ static void MX_USART6_UART_Init(void);
 static void MX_LPUART2_UART_Init(void);
 /* USER CODE BEGIN PFP */
 
+void setup()
+{
+	// setup pc connected uart buffer
+	uart_buffer_pc.uart_handle = &hlpuart2;
+	ring_buffer_init(&uart_buffer_pc.ringbuffer, uart_buffer_pc.ringbuffer_arr, RING_BUFFER_SIZE);
+	uart_buffer_pc.message_counter = 0;
+	uart_buffer_pc.message_size_encoded = 25 + cobs_size_increase;
+	uart_buffer_pc.cobs_buffer_encoded = cobs_buffer_encoded;
+	uart_buffer_pc.cobs_buffer_decoded = cobs_buffer_decoded;
+	HAL_UART_Receive_IT(uart_buffer_pc.uart_handle, &uart_buffer_pc.rx_byte, 1);
+
+	// setup motor driver connected uart buffers
+	motor_controller[0]=&huart2;
+	motor_controller[1]=&huart3;
+	motor_controller[2]=&huart4;
+	motor_controller[3]=&huart1;
+	motor_controller[4]=&huart5;
+	motor_controller[5]=&huart6;
+	for(int i=0; i<6; i++)
+	{
+		uart_buffer_motors[i].uart_handle = motor_controller[i];
+		ring_buffer_init(&uart_buffer_motors[i].ringbuffer, uart_buffer_motors[i].ringbuffer_arr, RING_BUFFER_SIZE);
+		uart_buffer_motors[i].message_counter = 0;
+		uart_buffer_motors[i].message_size_encoded = 4 + cobs_size_increase;
+		uart_buffer_motors[i].cobs_buffer_encoded = cobs_buffer_encoded;
+		uart_buffer_motors[i].cobs_buffer_decoded = cobs_buffer_decoded;
+		HAL_UART_Receive_IT(uart_buffer_motors[i].uart_handle, &uart_buffer_motors[i].rx_byte, 1);
+	}
+}
+
+void clear_uart_buffer_overflow_flags()
+{
+	if (__HAL_UART_GET_FLAG(&hlpuart2, UART_FLAG_ORE)) {
+		// Overrun error occurred, need to clear the flag
+		__HAL_UART_CLEAR_OREFLAG(&hlpuart2); // Use the clear macro
+		uint8_t ok_message[] = "ov";
+		HAL_UART_Transmit(&hlpuart2, ok_message, 3, 1);
+	}
+	for(int i=0;i<6;i++)
+	{
+		if (__HAL_UART_GET_FLAG(motor_controller[i], UART_FLAG_ORE)) {
+			// Overrun error occurred, need to clear the flag
+			__HAL_UART_CLEAR_OREFLAG(motor_controller[i]); // Use the clear macro
+			uint8_t ok_message[] = "om";
+			HAL_UART_Transmit(&hlpuart2, ok_message, 3, 1);
+		}
+	}
+}
+
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -120,33 +280,6 @@ int main(void)
 {
 
   /* USER CODE BEGIN 1 */
-//	motor_controller[0]=&huart2;
-//	motor_controller[1]=&huart1;
-//	motor_controller[2]=&huart3;
-//	motor_controller[3]=&huart4;
-//	motor_controller[4]=&huart5;
-//	motor_controller[5]=&huart6;
-
-	buffer_up_rx = ringbuf_new(STATIC_BUFFER_SIZE);
-	buffer_down_rx1=ringbuf_new(STATIC_BUFFER_SIZE);
-	buffer_down_rx2=ringbuf_new(STATIC_BUFFER_SIZE);
-	buffer_down_rx3=ringbuf_new(STATIC_BUFFER_SIZE);
-	buffer_down_rx4=ringbuf_new(STATIC_BUFFER_SIZE);
-	buffer_down_rx5=ringbuf_new(STATIC_BUFFER_SIZE);
-	buffer_down_rx6=ringbuf_new(STATIC_BUFFER_SIZE);
-	buffer_down_rx[0]=&buffer_down_rx1;
-	buffer_down_rx[1]=&buffer_down_rx2;
-	buffer_down_rx[2]=&buffer_down_rx3;
-	buffer_down_rx[3]=&buffer_down_rx4;
-	buffer_down_rx[4]=&buffer_down_rx5;
-	buffer_down_rx[5]=&buffer_down_rx6;
-
-	motor_controller[0]=&huart2;
-	motor_controller[1]=&huart3;
-	motor_controller[2]=&huart4;
-	motor_controller[3]=&huart1;
-	motor_controller[4]=&huart5;
-	motor_controller[5]=&huart6;
 
   /* USER CODE END 1 */
 
@@ -177,12 +310,12 @@ int main(void)
   MX_LPUART2_UART_Init();
   /* USER CODE BEGIN 2 */
   for(int i=0;i<24;i++){
-	  buffer_up[i]=0;
-	  buffer_down[i]=0;
+	  buffer_pc_tx[i]=0;
+//	  buffer_down[i]=0;
   }
   float temp=256.0;
   for(int i=0;i<6;i++){
-	  memcpy(&buffer_up[i*4],&temp,4);
+	  memcpy(&buffer_pc_tx[i*4],&temp,4);
   }
   uint32_t timestamp = 0;
   uint32_t upward_send_interval = 10;
@@ -191,124 +324,60 @@ int main(void)
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
-  timestamp = HAL_GetTick();
-  while (1)
-  {
-	if (__HAL_UART_GET_FLAG(&hlpuart2, UART_FLAG_ORE)) {
-		// Overrun error occurred, need to clear the flag
-		__HAL_UART_CLEAR_OREFLAG(&hlpuart2); // Use the clear macro
-		uint8_t ok_message[] = "ov";
-		HAL_UART_Transmit(&hlpuart2, ok_message, 3, upward_send_interval);
-	}
-//	for(int i=0;i<6;i++)
-//	{
-//		if (__HAL_UART_GET_FLAG(motor_controller[i], UART_FLAG_ORE)) {
-//			// Overrun error occurred, need to clear the flag
-//			__HAL_UART_CLEAR_OREFLAG(motor_controller[i]); // Use the clear macro
-//			uint8_t ok_message[] = "om";
-//			HAL_UART_Transmit(&hlpuart2, ok_message, 3, upward_send_interval);
+	setup();
+	timestamp = HAL_GetTick();
+
+	while (1)
+	{
+//		if(HAL_GetTick() - timestamp > 2000)
+//		{
+//			timestamp = HAL_GetTick();
+//			uint8_t ok_message[] = "b";
+//			HAL_UART_Transmit(&hlpuart2, ok_message, 1, 1);
 //		}
-//	}
-
-	HAL_UART_Receive_IT(&hlpuart2,	&buffer_up_byte, 1);
-	HAL_UART_Receive_IT(&huart1,  	&buffer_down_byte[0], 1);
-	HAL_UART_Receive_IT(&huart2,  	&buffer_down_byte[1], 1);
-	HAL_UART_Receive_IT(&huart3,  	&buffer_down_byte[2], 1);
-	HAL_UART_Receive_IT(&huart4,  	&buffer_down_byte[3], 1);
-	HAL_UART_Receive_IT(&huart5,  	&buffer_down_byte[4], 1);
-	HAL_UART_Receive_IT(&huart6,  	&buffer_down_byte[5], 1);
-	uint8_t rx_byte;
-	while(HAL_UART_Receive(&hlpuart2, &rx_byte, 1, 0) == HAL_OK)
-	{
-
-		HAL_UART_Transmit(&hlpuart2, &rx_byte, 1, 0);
-		continue;
-		ringbuf_memcpy_into(buffer_up_rx, &rx_byte, 1);
-		if (rx_byte == 0) // end of message received
+		clear_uart_buffer_overflow_flags();
+		// handle new messages from pc
+		message_status stat = retrieve_message(&uart_buffer_pc);
+		if (stat == NEW_MESSAGE_IN_DECODED_COBS_BUFFER)
 		{
-			// there should be a complete message in the buffer -> copy to cobs encoded buffer
-			int ret = (int)ringbuf_memcpy_from(cobs_buffer_encoded, buffer_up_rx, up_rx_message_length + cobs_size_increase);
-			if (ret == 0)
-			{
-				uint8_t ok_message[] = "low";
-				HAL_UART_Transmit(&hlpuart2, ok_message, 3, upward_send_interval);
-				continue;
-			}
-			// decode message
-			cobs_decode_result res = cobs_decode(cobs_buffer_decoded, cobs_buffer_decoded_size,
-					cobs_buffer_encoded, up_rx_message_length + cobs_size_increase -1);
-			if (res.status == COBS_DECODE_OK)
-			{
-				// message was successfully decoded
-				controllbyte = cobs_buffer_decoded[0];
-				memcpy(buffer_down, &cobs_buffer_decoded[1], buffer_down_size);
-				// TODO: also encode motor communication
-//				for(int i=0;i<6;i++)
-//				{
-//					HAL_UART_Transmit(motor_controller[i], &controllbyte, 1, 1);
-//					HAL_UART_Transmit(motor_controller[i], &buffer_down[i * 4], 4, 2);
-//				}
-				 uint8_t ok_message[] = "Ok";
-				HAL_UART_Transmit(&hlpuart2, ok_message, 3, upward_send_interval);
-			}
-			else
-			{
-				 uint8_t ok_message[] = "err";
-				HAL_UART_Transmit(&hlpuart2, ok_message, 3, upward_send_interval);
-			}
-		}
-	}
-
-	/*
-
-
-	if(HAL_UART_Receive(&hlpuart2, &controllbyte, 1, 0) == HAL_OK)
-	{
-		if(HAL_UART_Receive(&hlpuart2, buffer_down, 24, 3) == HAL_OK)
-		{
+			// forward messages to motor controllers
 			for(int i=0;i<6;i++)
 			{
-				HAL_UART_Transmit(motor_controller[i], &controllbyte, 1, 1);
-				HAL_UART_Transmit(motor_controller[i], &(buffer_down[i*4]), 4, 2);
+				uint8_t message[5];
+				message[0] = cobs_buffer_decoded[0]; // controllbyte of message
+				memcpy(&message[1], &cobs_buffer_decoded[1+i*4], 4);
+//				HAL_UART_Transmit(motor_controller[i], message, 5, 1);
+				HAL_UART_Transmit_IT(motor_controller[i], message, 5);
 			}
 		}
-		else
+
+		// handle new messages from motor controllers
+		for(int i=0;i<1;i++)
 		{
-			while(HAL_UART_Receive(&hlpuart2, &byte_tmp, 1, 0)==HAL_OK)
+			message_status stat = retrieve_message(&uart_buffer_motors[i]);
+//			if (stat != NO_NEW_MESSAGE)
+//			{
+//				HAL_UART_Transmit(&hlpuart2, &stat, 1, 1);
+//			}
+			if (stat == NEW_MESSAGE_IN_DECODED_COBS_BUFFER)
 			{
+				memcpy(&buffer_pc_tx[i*4], cobs_buffer_decoded, 4);
 			}
 		}
+
+		if(HAL_GetTick() - timestamp > upward_send_interval)
+		{
+			timestamp = HAL_GetTick();
+			cobs_encode_result res = cobs_encode(cobs_buffer_encoded, cobs_buffer_encoded_size, buffer_pc_tx, buffer_pc_tx_size);
+			cobs_buffer_encoded[buffer_pc_tx_size + cobs_size_increase - 1] = 0; // zero delimiter byte
+//			HAL_UART_Transmit(uart_buffer_pc.uart_handle, cobs_buffer_encoded, buffer_pc_tx_size + cobs_size_increase, 2);
+			HAL_UART_Transmit_IT(uart_buffer_pc.uart_handle, cobs_buffer_encoded, buffer_pc_tx_size + cobs_size_increase);
+		}
+
 	}
-	*/
-
-//	for(int i=0; i<6; i++){
-//		if(HAL_UART_Receive(motor_controller[i], &buffer_tmp[0], 1 , 0) == HAL_OK)
-//		{
-//			if(HAL_UART_Receive(motor_controller[i], &buffer_tmp[1], 3, 1) == HAL_OK)
-//			{
-//			  memcpy(&buffer_up[i*4], &buffer_tmp[0], 4);
-//			}
-//			else
-//			{
-//				while(HAL_UART_Receive(motor_controller[i], &byte_tmp, 1, 0)==HAL_OK)
-//				{
-//				}
-//			}
-//		}
-//	}
-//	if(HAL_GetTick() - timestamp > upward_send_interval)
-//	{
-//		cobs_encode_result res = cobs_encode(cobs_buffer_encoded, cobs_buffer_encoded_size, buffer_up, up_tx_message_length);
-//		cobs_buffer_encoded[up_tx_message_length_encoded - 1] = 0;
-//		HAL_UART_Transmit(&hlpuart2, cobs_buffer_encoded, up_tx_message_length_encoded, upward_send_interval);
-//		//		  HAL_UART_Transmit(&huart2, buffer_up, 24, upward_send_interval);
-//		timestamp = HAL_GetTick();
-//	}
-    /* USER CODE END WHILE */
-
-    /* USER CODE BEGIN 3 */
-  }
-  /* USER CODE END 3 */
+	/* USER CODE END WHILE */
+	/* USER CODE BEGIN 3 */
+	/* USER CODE END 3 */
 }
 
 /**
@@ -680,30 +749,36 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
+
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 {
-
-	if(huart==&hlpuart2){
-			ringbuf_memcpy_into(buffer_up_rx, &buffer_up_byte, 1);
-			HAL_UART_Receive_IT(&hlpuart2, &buffer_up_byte, 1);
-	}else if(huart==&huart1){
-			ringbuf_memcpy_into(*buffer_down_rx[0],  	&buffer_down_byte[0], 1);
-			HAL_UART_Receive_IT(&huart1,  		&buffer_down_byte[0], 1);
-	}else if(huart==&huart2){
-			ringbuf_memcpy_into(*buffer_down_rx[1],  	&buffer_down_byte[1], 1);
-			HAL_UART_Receive_IT(&huart2,  &buffer_down_byte[1], 1);
-	}else if(huart==&huart3){
-			ringbuf_memcpy_into(*buffer_down_rx[2],  	&buffer_down_byte[2], 1);
-			HAL_UART_Receive_IT(&huart3,  &buffer_down_byte[2], 1);
-	}else if(huart==&huart4){
-			ringbuf_memcpy_into(*buffer_down_rx[3],  	&buffer_down_byte[3], 1);
-			HAL_UART_Receive_IT(&huart4,  &buffer_down_byte[3], 1);
-	}else if(huart==&huart5){
-			ringbuf_memcpy_into(*buffer_down_rx[4],  	&buffer_down_byte[4], 1);
-			HAL_UART_Receive_IT(&huart5,  &buffer_down_byte[4], 1);
-	}else if(huart==&huart6){
-			ringbuf_memcpy_into(*buffer_down_rx[5],  	&buffer_down_byte[5], 1);
-			HAL_UART_Receive_IT(&huart6,  &buffer_down_byte[5], 1);
+	if(huart==uart_buffer_pc.uart_handle)
+	{
+		interrupt_callback(&uart_buffer_pc);
+	}
+	else if(huart==uart_buffer_motors[0].uart_handle)
+	{
+		interrupt_callback(&uart_buffer_motors[0]);
+	}
+	else if(huart==uart_buffer_motors[1].uart_handle)
+	{
+		interrupt_callback(&uart_buffer_motors[1]);
+	}
+	else if(huart==uart_buffer_motors[2].uart_handle)
+	{
+		interrupt_callback(&uart_buffer_motors[2]);
+	}
+	else if(huart==uart_buffer_motors[3].uart_handle)
+	{
+		interrupt_callback(&uart_buffer_motors[3]);
+	}
+	else if(huart==uart_buffer_motors[4].uart_handle)
+	{
+		interrupt_callback(&uart_buffer_motors[4]);
+	}
+	else if(huart==uart_buffer_motors[5].uart_handle)
+	{
+		interrupt_callback(&uart_buffer_motors[5]);
 	}
 }
 /* USER CODE END 4 */
