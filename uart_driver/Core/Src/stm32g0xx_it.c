@@ -181,7 +181,10 @@ void USART2_LPUART2_IRQHandler(void)
 void USART3_4_5_6_LPUART1_IRQHandler(void)
 {
   /* USER CODE BEGIN USART3_4_5_6_LPUART1_IRQn 0 */
-
+	  HAL_UART_IRQHandler(&huart3);
+	  HAL_UART_IRQHandler(&huart4);
+	  HAL_UART_IRQHandler(&huart5);
+	  HAL_UART_IRQHandler(&huart6);
   /* USER CODE END USART3_4_5_6_LPUART1_IRQn 0 */
   /* USER CODE BEGIN USART3_4_5_6_LPUART1_IRQn 1 */
 
